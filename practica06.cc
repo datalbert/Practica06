@@ -32,10 +32,13 @@
 #include "ns3/names.h"
 
 #include "ns3/traffic-control-layer.h"
+#include "ns3/traffic-control-helper.h"
 #include "ns3/queue-disc.h"
+#include "ns3/queue-disc-container.h"
 
 #include "ns3/gnuplot.h"
 #include "retardo.h"
+#include "cola_observador.h"
 
 using namespace ns3;
 
@@ -192,17 +195,17 @@ void escenario(uint32_t num_fuentes, double n_max_paq, Time duracion_simulacion,
         app_c.Get(i)->SetStopTime(duracion_simulacion);
     }    
 
-    //Creamos el objeto observador
-    //Observador* observador_udp = new Observador( app_container_sumidero.Get(0)->GetObject<UdpServer>() );
+   
 
     //Obtenemos la cola del dispositivo de red de una de las fuentes.
-   
-    Ptr<Queue<Packet>> cola_disp_fuente = c_dispositivos.Get(0)->GetObject<CsmaNetDevice>()->GetQueue();
+    Ptr<Queue<Packet>> cola_disp_fuente = c_dispositivos.Get(1)->GetObject<CsmaNetDevice>()->GetQueue();
 
-    //Obtenemos la cola de control de tráfico de una de las fuentes.
+    //control de tráfico.
     Ptr<TrafficControlLayer> tcl = clientes_c.Get(0)->GetObject<TrafficControlLayer> ();
-    Ptr<QueueDisc> cola_tcl_fuente = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(0));
-
+    Ptr<QueueDisc> cola_tcl_fuente = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(1));
+ 
+    //Creamos el observador de las colas tcl y transmisión.
+    ColaObservador* cola_observador = new ColaObservador(app_c.Get(0)->GetObject<OnOffApplication>(), cola_disp_fuente, cola_tcl_fuente);
 
     //Valor inicial de la cola
     //cola_fuente->SetMaxSize(QueueSize(ns3::PACKETS, tam_cola));
@@ -218,8 +221,6 @@ void escenario(uint32_t num_fuentes, double n_max_paq, Time duracion_simulacion,
     NS_LOG_INFO("Número de fuentes: "<< num_fuentes);
     NS_LOG_INFO("Tamaño de cola del dispositivo: "<< cola_disp_fuente->GetMaxSize().GetValue());
     NS_LOG_INFO("Tamaño de cola de control de tráfico: "<< cola_tcl_fuente->GetMaxSize().GetValue());
-    NS_LOG_INFO("Número de paquetes en la cola del dispositivo: "<< cola_disp_fuente->GetNPackets());
-    //NS_LOG_INFO("Número de paquetes en la cola de control de tráfico: "<< cola_tcl_fuente->GetNPackets());
     //NS_LOG_INFO("Número de paquetes recibidos por el servidor UDP: " << observador_udp->TotalPaquetes());
     //NS_LOG_INFO("Número de paquetes recibidos por la cola del conmutador: " << cola_servidor->GetTotalReceivedPackets());
     //NS_LOG_INFO("Numero de paquetes descartados por la cola: "<< cola_fuente->GetTotalDroppedPackets());
