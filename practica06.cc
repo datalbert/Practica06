@@ -105,14 +105,14 @@ int main(int argc, char *argv[])
 
     //Gráfica -> Retardo medio (ms)
     //===========================================================================================
-    std::string fileNameWithNoExtension_retardo = "practica05_retardo";
+    std::string fileNameWithNoExtension_retardo = "practica06_retardo";
     std::string graphicsFileName_retardo = fileNameWithNoExtension_retardo + ".png";
     std::string plotFileName_retardo = fileNameWithNoExtension_retardo + ".plt";
     std::string plotTitle_retardo="Retardo medio (ms) en funcion del tamaño de cola tcl";
     
     Gnuplot grafico_retardo(plotFileName_retardo);
     grafico_retardo.SetTitle (plotTitle_retardo);
-    grafico_retardo.SetLegend ("Tamaño cola servidor (pckts)"," Retardo medio (ms)");
+    grafico_retardo.SetLegend ("Tamaño cola servidor (pckts)"," Retardo medio (ns)");
     std::ofstream fichero_retardo(plotFileName_retardo);
 
 
@@ -164,8 +164,8 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     Ptr<Node> fuente = CreateObject<Node>();
     Ptr<Node> sumidero=CreateObject<Node>();
 
-    nodos.Add(fuente);
     nodos.Add(sumidero);
+    nodos.Add(fuente);
     
     InternetStackHelper h_pila;
     h_pila.SetIpv6StackInstall(false);
@@ -207,11 +207,11 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
         
     //-->Trazas y control de tráfico.
     //=====================================================================================================
-    Ptr<Queue<Packet>> cola_disp = c_dispositivos.Get(0)->GetObject<CsmaNetDevice>()->GetQueue();
+    Ptr<Queue<Packet>> cola_disp = c_dispositivos.Get(1)->GetObject<CsmaNetDevice>()->GetQueue();
     cola_disp->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
 
     Ptr<TrafficControlLayer> tcl = fuente->GetObject<TrafficControlLayer> ();
-    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(0));
+    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(1));
     cola_tcl->SetMaxSize(QueueSize( ns3::PACKETS, tam_tcl));
  
     ColaObservador* observador = new ColaObservador(app_c.Get(0)->GetObject<OnOffApplication>(), cola_disp, cola_tcl);
@@ -236,12 +236,12 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     std::cout <<"\nSumario: \n------------------\n";
     NS_LOG_INFO("OnOffApplication--> Comprobación media T.Total envío de un paquete: "<< observador->GetMediaIntervaloTx()<<" (s)");
     NS_LOG_INFO("Número de paquetes transmitidos por una fuente: "<< observador->GetNPaquetesTx());
-    NS_LOG_INFO("Retardo medio: "<< retardo.RetardoMedio());
+    NS_LOG_INFO("Retardo medio: "<< Seconds(retardo.RetardoMedio()));
     std::cout <<"===========================================================================================\n\n";
 
     //Introducimos los puntos en la curva.
     //=======================================================================================================
-    curva_retardo->Add(cola_tcl->GetMaxSize().GetValue(), retardo.RetardoMedio().GetNanoSeconds());
+    curva_retardo->Add(cola_tcl->GetMaxSize().GetValue(), retardo.RetardoMedio());
     
     Simulator::Destroy();
 }

@@ -30,31 +30,39 @@ Retardo::Retardo (ApplicationContainer c_app_fuentes, int num_fuentes, Ptr<UdpSe
 void
 Retardo::PaqueteTransmitido(Ptr<const Packet> paquete){
   
-  m_tiempo_tx = Simulator::Now();
-  NS_LOG_INFO ("Paquete tx en:" << m_tiempo_tx.GetSeconds());
-  
-  m_cuenta++;
+  //-->Etiquetamos el paquete
+  TimestampTag tag;
+  tag.SetTimestamp(Simulator::Now());
+  paquete->AddPacketTag(tag);  
+
+  Time tiempo = tag.GetTimestamp();
+  NS_LOG_INFO(tiempo);
 }
 
 
 void
 Retardo::PaqueteRecibido(Ptr<const Packet> paquete)
 {
+  NS_LOG_INFO (paquete <<" Paquete rx en:" << Simulator::Now().GetSeconds());
   
-  NS_LOG_FUNCTION (paquete);
-  //m_tiempo_rx = Simulator::Now();
+  //Obtenemos la etiqueta del paquete y el tiempo de envío
+  TimestampTag tag;
+  paquete->PeekPacketTag(tag);
+
+  Time tiempo_tx = tag.GetTimestamp();
   
-  media_retardo.Update((Simulator::Now() - m_tiempo_tx).GetSeconds());
+  media_retardo.Update((
+      Simulator::Now() - tiempo_tx 
+    ).GetDouble());
 
-  NS_LOG_INFO ("Paquete rx en:" << m_tiempo_rx.GetSeconds());
-
+    NS_LOG_INFO ("Recibido: "<< tiempo_tx);
 }
 
 
-Time
+double
 Retardo::RetardoMedio ()
 {
-  return Seconds(media_retardo.Avg());
+  return media_retardo.Avg();
 }
 
 double
