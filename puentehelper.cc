@@ -10,7 +10,7 @@
   BridgeHelper       h_bridge;
   Ptr<Node>          puente = CreateObject<Node> ();
   
-  sh_csma.SetChannelAttribute("DataRate", tasa_envio);
+  h_csma.SetChannelAttribute("DataRate", tasa_envio);
   for (NodeContainer::Iterator indice = nodosLan.Begin ();
        indice != nodosLan.End ();
        indice++)
