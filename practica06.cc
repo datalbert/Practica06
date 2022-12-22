@@ -156,41 +156,86 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
                 Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRateValue c_transmision,
                  double tam_cola, double tam_tcl, Gnuplot2dDataset* curva_retardo)
 {
-
-    //--> Nodos
+    
+    // --> Configuración global a todos los nodos.
     //=====================================================================================================
+    NodeContainer nodos_red_interna;
+    NodeContainer nodos_red_externa;
     NodeContainer nodos;
 
-    Ptr<Node> fuente = CreateObject<Node>();
-    Ptr<Node> sumidero=CreateObject<Node>();
+    NodeContainer fuentes(num_fuentes);
 
-    nodos.Add(sumidero);
-    nodos.Add(fuente);
+    Ptr<Node> encaminador = CreateObject<Node>();
+    Ptr<Node> sumidero = CreateObject<Node>();
     
+    nodos.Add(encaminador);
+    nodos.Add(sumidero);
+    nodos.Add(fuentes);
+
     InternetStackHelper h_pila;
     h_pila.SetIpv6StackInstall(false);
     h_pila.Install(nodos);
 
-    NetDeviceContainer c_dispositivos;
+    //--> Nodos red interna, puente
+    //=====================================================================================================
+
+    nodos_red_interna.Add(encaminador);
+    nodos_red_interna.Add(fuentes);
+
+    NetDeviceContainer disp_red_interna;
     
     PuenteHelper h_puente;
-    Ptr<Node> puente = h_puente.Puentehelper(nodos, c_dispositivos, c_transmision);
+    Ptr<Node> puente = h_puente.Puentehelper(nodos_red_interna, disp_red_interna, c_transmision);
 
-    Ipv4AddressHelper h_direcciones ("10.1.2.0", "255.255.255.0");
-    Ipv4InterfaceContainer c_interfaces = h_direcciones.Assign (c_dispositivos);
-    Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+    Ipv4AddressHelper h_direcciones_interna ("10.1.0.0", "255.255.0.0");
+    Ipv4InterfaceContainer interfaces_red_interna = h_direcciones_interna.Assign (
+        disp_red_interna
+    );
     
+    //--> Red Externa, Encaminador por su interfaz externa y sumidero.
+    //=====================================================================================================
+
+    CsmaHelper h_csma;
+    h_csma.SetChannelAttribute("DataRate", c_transmision);
+
+    nodos_red_externa.Add(encaminador);
+    nodos_red_externa.Add(sumidero);
+    
+    NetDeviceContainer disp_red_externa = h_csma.Install(nodos_red_externa);
+
+    Ipv4AddressHelper h_direcciones_externa ("10.2.0.0", "255.255.0.0");
+    Ipv4InterfaceContainer interfaces_red_externa = h_direcciones_externa.Assign (
+        disp_red_externa
+    );
+
     uint16_t puerto=20;
-    InetSocketAddress direcciones(c_interfaces.GetAddress(0,0),puerto);
-    
 
-    //Configuracion sumidero
-    //====================================================================================================
     UdpServerHelper sum_udp(puerto);
     ApplicationContainer app_container_sumidero=sum_udp.Install(sumidero); 
     
-    //--> OnOfApplication
+    //--> Para todos los nodos
     //=====================================================================================================
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+    // -> tam de cola de transmisión.
+    
+    //Red interna
+    for( uint32_t i = 0; i <= nodos_red_interna.GetN(); i ++ ){
+        nodos_red_interna.Get(i)->GetDevice(0)->GetObject<CsmaNetDevice>()->GetQueue()
+                ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+    }
+    //Red externa.
+    
+    /*encaminador->GetDevice(1)->GetObject<CsmaNetDevice>()->GetQueue()
+            ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+    
+    sumidero->GetDevice(0)->GetObject<CsmaNetDevice>()->GetQueue()
+            ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+    */   
+
+    //--> OnOfApplication fuentes
+    //=====================================================================================================
+    InetSocketAddress direcciones(interfaces_red_externa.GetAddress(1,0),puerto);
     OnOffHelper onoff("ns3::UdpSocketFactory",direcciones);
     
     onoff.SetAttribute("OnTime", PointerValue(t_on));
@@ -201,23 +246,17 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
 
     ApplicationContainer app_c;
 
-    for (uint32_t i = 0; i <= num_fuentes; i++){
-        app_c.Add(onoff.Install(fuente));
-    }
-        
+    app_c.Add(onoff.Install(fuentes));
+    
     //-->Trazas y control de tráfico.
     //=====================================================================================================
-    Ptr<Queue<Packet>> cola_disp = c_dispositivos.Get(1)->GetObject<CsmaNetDevice>()->GetQueue();
-    cola_disp->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
-
-    Ptr<TrafficControlLayer> tcl = fuente->GetObject<TrafficControlLayer> ();
-    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(1));
+    Ptr<TrafficControlLayer> tcl = encaminador->GetObject<TrafficControlLayer> ();
+    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice(disp_red_externa.Get(0));
+    
     cola_tcl->SetMaxSize(QueueSize( ns3::PACKETS, tam_tcl));
- 
-    ColaObservador* observador = new ColaObservador(app_c.Get(0)->GetObject<OnOffApplication>(), cola_disp, cola_tcl);
+
     Retardo retardo(app_c, num_fuentes, app_container_sumidero.Get(0)->GetObject<UdpServer>());
     
-
     std::cout <<"Nueva Simulación.\n";
     std::cout <<"===========================================================================================\n";
   
@@ -225,7 +264,7 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     NS_LOG_INFO("Régimen Binario de las fuentes : " << tasa_envio);
     NS_LOG_INFO("Tamaño de cola del dispositivo: "<< tam_cola);
     NS_LOG_INFO("Tamaño de colas de control de tráfico: "<< tam_tcl);
-    NS_LOG_INFO("Duracion de la comunicación VoIP: "<< duracion_comunicacion);
+    NS_LOG_INFO("Duración de la comunicación VoIP: "<< duracion_comunicacion);
     std::cout <<"\n";
  
     NS_LOG_INFO("Arranca Simulación");
@@ -234,8 +273,8 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     NS_LOG_INFO("Fin simulación");
     
     std::cout <<"\nSumario: \n------------------\n";
-    NS_LOG_INFO("OnOffApplication--> Comprobación media T.Total envío de un paquete: "<< observador->GetMediaIntervaloTx()<<" (s)");
-    NS_LOG_INFO("Número de paquetes transmitidos por una fuente: "<< observador->GetNPaquetesTx());
+    //NS_LOG_INFO("OnOffApplication--> Comprobación media T.Total envío de un paquete: "<< observador->GetMediaIntervaloTx()<<" (s)");
+    //NS_LOG_INFO("Número de paquetes transmitidos por una fuente: "<< observador->GetNPaquetesTx());
     NS_LOG_INFO("Retardo medio: "<< Seconds(retardo.RetardoMedio()));
     std::cout <<"===========================================================================================\n\n";
 
