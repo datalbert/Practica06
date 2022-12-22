@@ -16,11 +16,11 @@ using namespace ns3;
 class Retardo
 {
 public:
-           Retardo      (ApplicationContainer c_app_fuentes, Ptr<UdpServer> receptor);
+           Retardo      (ApplicationContainer c_app_fuentes,int num_fuentes, Ptr<UdpServer> receptor);
   void     PaqueteTransmitido (Ptr<const Packet> paquete);
   void     PaqueteRecibido (Ptr<const Packet> paquete);
   double   TotalPaquetesTx(void);
-  Time RetardoMedio   ();
+  double RetardoMedio   ();
 
 private:
   Time m_tiempo_tx;

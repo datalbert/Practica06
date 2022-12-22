@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     std::string tasa_envio_value = "64kbps";
     std::string t_on_value = "350ms";
     std::string t_off_value = "650ms";
-    std::string duracion_comunicacion_value = "50s";
+    std::string duracion_comunicacion_value = "100s";
 
     double tam_cola_inicial = 1;
     
@@ -165,7 +165,7 @@ escenario(uint32_t num_fuentes, /*double n_max_paq,*/ Time duracion_simulacion,
     Ipv4InterfaceContainer c_interfaces =h_direcciones.Assign (c_dispositivos);
     Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
     
-    InetSocketAddress direcciones(c_interfaces.GetAddress(0,0),puerto);
+    InetSocketAddress direcciones(c_interfaces.GetAddress(1,0),puerto);
     
     //--> OnOfApplication
     //=====================================================================================================
@@ -185,14 +185,15 @@ escenario(uint32_t num_fuentes, /*double n_max_paq,*/ Time duracion_simulacion,
     //-->Control de tráfico.
     //=====================================================================================================
     Ptr<Queue<Packet>> cola_disp_fuente = c_dispositivos.Get(0)->GetObject<CsmaNetDevice>()->GetQueue();
-
+    double tam_cola_disp=1;
+    cola_disp_fuente -> SetMaxSize(QueueSize(ns3::PACKETS, tam_cola_disp));
     Ptr<TrafficControlLayer> tcl = c_todos.Get(0)->GetObject<TrafficControlLayer> ();
     Ptr<QueueDisc> cola_tcl_fuente = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(0));
     cola_tcl_fuente->SetMaxSize(QueueSize(ns3::PACKETS, tam_cola));
  
     ColaObservador* observador_onoff = new ColaObservador(app_c.Get(0)->GetObject<OnOffApplication>(), cola_disp_fuente, cola_tcl_fuente);
 
-    Retardo retardo(app_c,app_container_sumidero.Get(0)->GetObject<UdpServer>());
+    Retardo retardo(app_c,num_fuentes,app_container_sumidero.Get(0)->GetObject<UdpServer>());
     
 
     
@@ -210,7 +211,7 @@ escenario(uint32_t num_fuentes, /*double n_max_paq,*/ Time duracion_simulacion,
     
   
     NS_LOG_INFO("Fin simulación");
-    return retardo.RetardoMedio().GetDouble();
+    return retardo.RetardoMedio();
 
 }
 
