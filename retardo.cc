@@ -5,23 +5,21 @@
 #include "ns3/simulator.h"
 #include "ns3/onoff-application.h"
 #include "ns3/application-container.h"
-#include "ns3/packet.h"
-
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("Retardo");
 
-TimestampTag etiqueta_tiempo_paq;
-Retardo::Retardo (ApplicationContainer c_app_fuentes,int num_fuentes, Ptr<UdpServer> receptor){
+TimestampTag tag;
+Retardo::Retardo (ApplicationContainer c_app_fuentes, int num_fuentes, Ptr<UdpServer> receptor){
 
   m_cuenta = 0;
-  
-  for (int i=0;i<num_fuentes;i++){
+  for (int i = 0; i < num_fuentes; i++)
+  {
     c_app_fuentes.Get(i)->GetObject<OnOffApplication>()->TraceConnectWithoutContext ("Tx",
-                                        MakeCallback(&Retardo::PaqueteTransmitido,
-                                                      this));
-}
+					                            MakeCallback(&Retardo::PaqueteTransmitido,
+                                                    this));
+  }
   receptor->TraceConnectWithoutContext ("Rx",
                                         MakeCallback(&Retardo::PaqueteRecibido,
                                                      this)); 
@@ -31,36 +29,41 @@ Retardo::Retardo (ApplicationContainer c_app_fuentes,int num_fuentes, Ptr<UdpSer
 
 void
 Retardo::PaqueteTransmitido(Ptr<const Packet> paquete){
-  m_tiempo_tx = Simulator::Now();
-  TimestampTag etiqueta_tiempo_paq;
-  etiqueta_tiempo_paq.SetTimestamp(m_tiempo_tx);
-  paquete->AddPacketTag(etiqueta_tiempo_paq);
-  NS_LOG_INFO ("Paquete tx en:" << m_tiempo_tx.GetSeconds());
   
-  m_cuenta++;
+  //-->Etiquetamos el paquete
+  //TimestampTag tag;
+  tag.SetTimestamp(Simulator::Now());
+  paquete->AddPacketTag(tag);  
+
+  Time tiempo = tag.GetTimestamp();
+  NS_LOG_INFO(tiempo);
 }
 
 
 void
 Retardo::PaqueteRecibido(Ptr<const Packet> paquete)
 {
+  NS_LOG_INFO (paquete <<" Paquete rx en:" << Simulator::Now().GetSeconds());
   
-  NS_LOG_FUNCTION (paquete);
-  //m_tiempo_rx = Simulator::Now();
-  NS_LOG_DEBUG("entra aqui");
-  paquete->PeekPacketTag(etiqueta_tiempo_paq);
-  m_tiempo_rx=etiqueta_tiempo_paq.GetTimestamp();
-  NS_LOG_DEBUG("El paq "<<paquete<<" con RETARDO MEDIO"<<(Simulator::Now() - m_tiempo_rx).GetDouble());
-  media_retardo.Update((Simulator::Now() - m_tiempo_rx).GetDouble());
-  
+  //Obtenemos la etiqueta del paquete y el tiempo de envío
+  //TimestampTag tag;
+  paquete->PeekPacketTag(tag);
 
+  Time tiempo_tx = tag.GetTimestamp();
+  
+  media_retardo.Update((
+      Simulator::Now() - tiempo_tx 
+    ).GetDouble());
+  Time retardo=Simulator::Now() - tiempo_tx;
+    NS_LOG_INFO ("Transmitido: "<< tiempo_tx);
+    NS_LOG_DEBUG("RETARDO:" << retardo);
 }
 
 
-double
+Time
 Retardo::RetardoMedio ()
 {
-  return media_retardo.Avg();
+  return NanoSeconds(media_retardo.Mean());
 }
 
 double
