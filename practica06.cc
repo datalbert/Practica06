@@ -51,14 +51,14 @@ int main(int argc, char *argv[])
     Time::SetResolution(Time::NS);
   
     uint32_t num_fuentes= 2;  // Último dígito del número de grupo. 
-    std::string int_envio_cliente_value = "1ms";  //Por defecto es el intervalo mínimo, cercano al teórico al que no se pierden paquetes.
+    std::string int_envio_cliente_value = "2ms";  //Por defecto es el intervalo mínimo, cercano al teórico al que no se pierden paquetes.
     double tam_paq_value = 8192;
     double tam_cola_inicial = 50;
     int num_curvas = 4;
     int num_puntos = 5; // Numero de veces que se decrementará la cola del conmutador.
     double error = 2;
-    double n_max_paq = ( 400 + 100*( 13 % 4 ) ); //13 -> número de grupo
-
+    //double n_max_paq = ( 400 + 100*( 13 % 4 ) ); //13 -> número de grupo
+    double n_max_paq=25;
     //Capacidad de los enlaces
     std::string c_transmision_value = "1Mbps";
     //-----------------------------------------------------------
@@ -84,64 +84,7 @@ int main(int argc, char *argv[])
     //Duración de la simulación acorde al número máximo de paquetes a enviar.
     Time duracion_simulacion = Time( n_max_paq * int_envio_cliente + Time("10ms") ); //Tiempo prudencial para establecer conexión
 
-    //Gráfica -> Pérdida de paquetes entre tamano de cola
-    /*std::string fileNameWithNoExtension_perdidas = "practica05_perdidas";
-    std::string graphicsFileName_perdidas= fileNameWithNoExtension_perdidas + ".png";
-    std::string plotFileName_perdidas= fileNameWithNoExtension_perdidas + ".plt";
-    std::string plotTitle_perdidas="Porcentaje Paquetes perdidos en funcion del tamaño de cola";
     
-    Gnuplot grafico_perdidas(plotFileName_perdidas);
-    grafico_perdidas.SetTitle (plotTitle_perdidas);
-    grafico_perdidas.SetLegend ("Tamaño cola servidor (pckts)"," % de Paquetes perdidos");
-    std::ofstream fichero_perdidas(plotFileName_perdidas);
-    
-    //Gráfica -> Retardo medio entre tamano de cola
-    std::string fileNameWithNoExtension_retardo = "practica05_retardo";
-    std::string graphicsFileName_retardo= fileNameWithNoExtension_retardo + ".png";
-    std::string plotFileName_retardo= fileNameWithNoExtension_retardo + ".plt";
-    std::string plotTitle_retardo="Retardo Medio en función del tamano de cola";
-    
-    Gnuplot grafico_retardo(plotFileName_retardo);
-    grafico_retardo.SetTitle (plotTitle_retardo);
-    grafico_retardo.SetLegend ("Tamaño cola servidor (pckts) ","Retardo Medio (ns)");
-    std::ofstream fichero_retardo(plotFileName_retardo);
-
-    // --> Modificamos el número de fuentes Generamos una curva para cada gráfico en cada iteración.
-    uint32_t num_fuentes_inicial = num_fuentes;
-
-    for (int i = 0; i < num_curvas; i ++){
-            
-        Gnuplot2dDataset curva_perdidas;
-        Gnuplot2dDataset curva_retardo;
-
-        std::string dataTitle_perdidas="Número de fuentes: " + std::to_string(num_fuentes);
-        curva_perdidas.SetTitle (dataTitle_perdidas);
-        curva_perdidas.SetStyle (Gnuplot2dDataset::LINES_POINTS);
-
-        std::string dataTitle_retardo="Número de fuentes: " + std::to_string(num_fuentes);
-        curva_retardo.SetTitle (dataTitle_retardo);
-        curva_retardo.SetStyle (Gnuplot2dDataset::LINES_POINTS);
-
-        double tam_cola = tam_cola_inicial;
-        
-        //Obtenemos puntos para un número de fuentes
-        for ( int j = 0; j < num_puntos; j++){
-            escenario(num_fuentes, n_max_paq, duracion_simulacion, int_envio_cliente, tam_paq_value, c_transmision, tam_cola,  error, &curva_perdidas, &curva_retardo);
-            tam_cola-=(tam_cola/2);
-        }
-        grafico_perdidas.AddDataset(curva_perdidas);
-        grafico_retardo.AddDataset(curva_retardo);
-
-        num_fuentes += (num_fuentes_inicial);
-    }
-    grafico_perdidas.GenerateOutput(fichero_perdidas);
-    fichero_perdidas << "pause -1" << std::endl;
-    fichero_perdidas.close();
-
-    grafico_retardo.GenerateOutput(fichero_retardo);
-    fichero_retardo << "pause -1" << std::endl;
-    fichero_retardo.close();
-    */
 
    escenario(num_fuentes, n_max_paq, duracion_simulacion, int_envio_cliente, tam_paq_value, c_transmision, tam_cola_inicial);
 
@@ -203,7 +146,7 @@ void escenario(uint32_t num_fuentes, double n_max_paq, Time duracion_simulacion,
     //control de tráfico.
     Ptr<TrafficControlLayer> tcl = clientes_c.Get(0)->GetObject<TrafficControlLayer> ();
     Ptr<QueueDisc> cola_tcl_fuente = tcl->GetRootQueueDiscOnDevice(c_dispositivos.Get(1));
- 
+    cola_tcl_fuente->SetMaxSize(QueueSize("10p"));
     //Creamos el observador de las colas tcl y transmisión.
     ColaObservador* cola_observador = new ColaObservador(app_c.Get(0)->GetObject<OnOffApplication>(), cola_disp_fuente, cola_tcl_fuente);
 

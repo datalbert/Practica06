@@ -12,6 +12,7 @@ class ColaObservador
 public:
            ColaObservador      (Ptr<OnOffApplication> app_fuente, Ptr<Queue<Packet>> cola_dispo, Ptr<QueueDisc> cola_tcl);
   void     PaqueteTx_fuente (Ptr<const Packet> paquete);
+  void Paquetetirado_fuente(Ptr< const QueueDiscItem > item);
 
 private:
   Ptr<Queue<Packet>> m_cola_dispo;
