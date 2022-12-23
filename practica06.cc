@@ -1,4 +1,14 @@
+/*
+    Planificación y simulación de redes 2022/2023.
+    
+    Práctica 06 
 
+    Autores: Nombre - UVUS 
+        Manuel Domínguez Montero - mandommon.
+        Alberto Ávila Fernandez - poner aquí !!.
+
+========================================================        
+*/
 #include "ns3/command-line.h"
 #include "ns3/core-module.h"
 #include "ns3/simulator.h"
@@ -39,6 +49,8 @@
 #include "retardo.h"
 #include "cola_observador.h"
 
+#include "Observador.h"
+
 #include "ns3/random-variable-stream.h"
 
 using namespace ns3;
@@ -65,8 +77,8 @@ int main(int argc, char *argv[])
     int num_curvas = 4;
     int num_puntos = 8; 
 
-    //Capacidad de los enlaces
-    std::string c_transmision_value = "1Mbps";
+    // Capacidad de los enlaces
+    std::string c_transmision_value = "200Mbps";
     //-----------------------------------------------------------
 
     // Configuracion linea de comandos
@@ -99,11 +111,11 @@ int main(int argc, char *argv[])
 
     Time duracion_comunicacion = Time(duracion_comunicacion_value);
 
-    //Duración de la simulación acorde al número máximo de paquetes a enviar.
+    // Duración de la simulación acorde al número máximo de paquetes a enviar.
     Time duracion_simulacion = Time( duracion_comunicacion + Time("100ms") ); //Tiempo prudencial para establecer conexión
 
 
-    //Gráfica -> Retardo medio (ms)
+    // Gráfica -> Retardo medio
     //===========================================================================================
     std::string fileNameWithNoExtension_retardo = "practica06_retardo";
     std::string graphicsFileName_retardo = fileNameWithNoExtension_retardo + ".png";
@@ -116,7 +128,7 @@ int main(int argc, char *argv[])
     std::ofstream fichero_retardo(plotFileName_retardo);
 
 
-    //--> Bucle principal.
+    // --> Bucle principal.
     //============================================================================================
     uint32_t num_fuentes_inicial = num_fuentes;
 
@@ -157,81 +169,88 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
                  double tam_cola, double tam_tcl, Gnuplot2dDataset* curva_retardo)
 {
     
-    // --> Configuración global a todos los nodos.
+    // --> Nodos y Contenedores.
     //=====================================================================================================
-    NodeContainer nodos_red_interna;
-    NodeContainer nodos_red_externa;
-    NodeContainer nodos;
-
-    NodeContainer fuentes(num_fuentes);
-
     Ptr<Node> encaminador = CreateObject<Node>();
     Ptr<Node> sumidero = CreateObject<Node>();
+    NodeContainer fuentes(num_fuentes);
     
+    NodeContainer nodos_red_interna;
+    nodos_red_interna.Add(encaminador);
+    nodos_red_interna.Add(fuentes);
+
+    NodeContainer nodos_red_externa;
+    nodos_red_externa.Add(encaminador);
+    nodos_red_externa.Add(sumidero);
+
+    NodeContainer nodos;
     nodos.Add(encaminador);
     nodos.Add(sumidero);
     nodos.Add(fuentes);
 
+    // --> Puente
+    //=====================================================================================================
+    PuenteHelper h_puente;
+    NetDeviceContainer disp_red_interna;
+
+    Ptr<Node> puente = h_puente.Puentehelper(nodos_red_interna, disp_red_interna, c_transmision);
+
+    // --> Encaminador
+    //=====================================================================================================
+    CsmaHelper h_csma;
+    h_csma.SetChannelAttribute("DataRate", c_transmision);
+
+    //-> Nivel de enlace
+    NetDeviceContainer disp_red_externa;
+    disp_red_externa = h_csma.Install(nodos_red_externa);
+
+    // Nivel de Red.
+    //=====================================================================================================
     InternetStackHelper h_pila;
     h_pila.SetIpv6StackInstall(false);
     h_pila.Install(nodos);
-
-    //--> Nodos red interna, puente
+   
+    // --> Red interna, direccionamiento.
     //=====================================================================================================
-
-    nodos_red_interna.Add(encaminador);
-    nodos_red_interna.Add(fuentes);
-
-    NetDeviceContainer disp_red_interna;
-    
-    PuenteHelper h_puente;
-    Ptr<Node> puente = h_puente.Puentehelper(nodos_red_interna, disp_red_interna, c_transmision);
-
     Ipv4AddressHelper h_direcciones_interna ("10.1.0.0", "255.255.0.0");
+
     Ipv4InterfaceContainer interfaces_red_interna = h_direcciones_interna.Assign (
         disp_red_interna
     );
     
-    //--> Red Externa, Encaminador por su interfaz externa y sumidero.
+    // --> Red Externa, Encaminador por su interfaz externa y sumidero, direccionamiento.
     //=====================================================================================================
-
-    CsmaHelper h_csma;
-    h_csma.SetChannelAttribute("DataRate", c_transmision);
-
-    nodos_red_externa.Add(encaminador);
-    nodos_red_externa.Add(sumidero);
-    
-    NetDeviceContainer disp_red_externa = h_csma.Install(nodos_red_externa);
-
     Ipv4AddressHelper h_direcciones_externa ("10.2.0.0", "255.255.0.0");
+
     Ipv4InterfaceContainer interfaces_red_externa = h_direcciones_externa.Assign (
         disp_red_externa
     );
 
+    // --> habilitamos encaminamiento.
+    //=====================================================================================================
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+    // --> Sumidero
+    //=====================================================================================================
     uint16_t puerto=20;
 
     UdpServerHelper sum_udp(puerto);
     ApplicationContainer app_container_sumidero=sum_udp.Install(sumidero); 
-    
-    //--> Para todos los nodos
-    //=====================================================================================================
-    Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-    // -> tam de cola de transmisión.
-    
-    //Red interna
-    for( uint32_t i = 0; i <= nodos_red_interna.GetN(); i ++ ){
-        nodos_red_interna.Get(i)->GetDevice(0)->GetObject<CsmaNetDevice>()->GetQueue()
-                ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+    // --> tam de cola de transmisión.
+     //=====================================================================================================
+    for( uint32_t i = 0; i < num_fuentes; i++ ){
+        fuentes.Get(i)->GetDevice(0)->GetObject<CsmaNetDevice>()
+            ->GetQueue()->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
     }
-    //Red externa.
-    
-    /*encaminador->GetDevice(1)->GetObject<CsmaNetDevice>()->GetQueue()
-            ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
-    
-    sumidero->GetDevice(0)->GetObject<CsmaNetDevice>()->GetQueue()
-            ->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
-    */   
+    for( uint32_t i = 0; i < 2; i++ ){
+        encaminador->GetDevice(i)->GetObject<CsmaNetDevice>()
+            ->GetQueue()->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+    }
+    sumidero->GetDevice(0)->GetObject<CsmaNetDevice>()
+        ->GetQueue()->SetMaxSize(QueueSize( ns3::PACKETS, tam_cola));
+
+     
 
     //--> OnOfApplication fuentes
     //=====================================================================================================
@@ -251,11 +270,12 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     //-->Trazas y control de tráfico.
     //=====================================================================================================
     Ptr<TrafficControlLayer> tcl = encaminador->GetObject<TrafficControlLayer> ();
-    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice(disp_red_externa.Get(0));
+    Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice( encaminador->GetDevice(1) );
     
     cola_tcl->SetMaxSize(QueueSize( ns3::PACKETS, tam_tcl));
 
     Retardo retardo(app_c, num_fuentes, app_container_sumidero.Get(0)->GetObject<UdpServer>());
+    Observador observador (app_container_sumidero.Get(0)->GetObject<UdpServer>());
     
     std::cout <<"Nueva Simulación.\n";
     std::cout <<"===========================================================================================\n";
