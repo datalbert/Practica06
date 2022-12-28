@@ -47,7 +47,7 @@ NS_LOG_COMPONENT_DEFINE("Practica06");
 
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                      DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, Ptr<ExponentialRandomVariable> t_off,
-                     uint64_t tam_paq, DataRateValue c_transmision, double tam_cola, double tam_tcl,
+                     uint64_t tam_paq, DataRate c_transmision, double tam_cola, double tam_tcl,
                      Average<double>* retardo_media);
 
 int main(int argc, char *argv[])
@@ -59,14 +59,14 @@ int main(int argc, char *argv[])
     std::string tasa_envio_value = "96kbps";
     std::string t_on_value = "350ms";
     std::string t_off_value = "650ms";
-    std::string duracion_comunicacion_value = "250s";
-    double tam_tcl_ini = 300;
+    std::string duracion_comunicacion_value = "300s";
+    double tam_tcl_ini = 2;
     double tam_cola = 1;
     int num_curvas = 4;
     int num_puntos = 8; 
 
     //Capacidad de los enlaces
-    std::string c_transmision_value = "1Mbps";
+    std::string c_transmision_value = "100Kb/s";
     //-----------------------------------------------------------
 
     // Configuracion linea de comandos
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 
     // Conversión de parámetros a objetos ns3
     //=========================================================================================
-    DataRateValue c_transmision = DataRateValue(c_transmision_value);
+    DataRate c_transmision = DataRate("100kb/s");
     DataRate tasa_envio = DataRate(tasa_envio_value);
 
     Ptr<ExponentialRandomVariable> t_on  = CreateObject<ExponentialRandomVariable> ();
@@ -131,8 +131,8 @@ int main(int argc, char *argv[])
         double tam_tcl = tam_tcl_ini;
         
         //Obtenemos puntos para un número de fuentes
+        Average<double> retardo_media;
         for ( int j = 0; j < num_puntos; j++){
-            Average<double> retardo_media;
             for (int z=0; z<12;z++){
                 escenario(num_fuentes, duracion_simulacion, duracion_comunicacion,
                         tasa_envio, t_on, t_off,
@@ -140,11 +140,14 @@ int main(int argc, char *argv[])
                         &retardo_media);
                 
             }
-            NS_LOG_DEBUG("Retardo para la curva "<< i << " el punto " << j << " es igual " << retardo_media.Avg());
+            NS_LOG_DEBUG("Retardo para la curva "<< i << " el punto " << j << " con tam cola; "<< tam_tcl <<" es igual " << retardo_media.Avg());
             double error=TSTUDENT*sqrt(retardo_media.Var()/retardo_media.Count());
-            curva_retardo.Add(tam_tcl, retardo_media.Mean(),error);
+            curva_retardo.Add(tam_tcl, retardo_media.Avg(),error);
             tam_tcl+=5;
+            retardo_media.Reset();
         }
+        NS_LOG_DEBUG("------------------");
+
         grafico_retardo.AddDataset(curva_retardo);
 
         num_fuentes += (num_fuentes_inicial);
@@ -158,12 +161,12 @@ int main(int argc, char *argv[])
 
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                 DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, 
-                Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRateValue c_transmision,
+                Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRate c_transmision,
                  double tam_cola, double tam_tcl, Average<double>* retardo_media)
 {
 
-    //--> Nodos
-    //=====================================================================================================
+    Simulator::Destroy();
+    
     NodeContainer nodos;
 
     Ptr<Node> fuente = CreateObject<Node>();
@@ -200,14 +203,16 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     
     onoff.SetAttribute("OnTime", PointerValue(t_on));
     onoff.SetAttribute("OffTime", PointerValue(t_off));
-    onoff.SetAttribute("DataRate", DataRateValue(tasa_envio));
-    onoff.SetAttribute("PacketSize", UintegerValue(tam_paq));
+    //onoff.SetAttribute("DataRate", DataRateValue(tasa_envio));
+    //onoff.SetAttribute("PacketSize", UintegerValue(tam_paq));
+    
+    onoff.SetConstantRate(tasa_envio);
     onoff.SetAttribute("StopTime", TimeValue(duracion_comunicacion));
 
     ApplicationContainer app_c;
 
     for (uint32_t i = 0; i <= num_fuentes; i++){
-        app_c.Add(onoff.Install(fuente));
+        app_c.Add(onoff.Install(nodos.Get(1)));
     }
         
     //-->Trazas y control de tráfico.
@@ -246,7 +251,7 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     //=======================================================================================================
     retardo_media->Update(retardo.RetardoMedio().GetDouble());
     
-    Simulator::Destroy();
+    
 }
 
 

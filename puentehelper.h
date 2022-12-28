@@ -20,7 +20,7 @@ class PuenteHelper
 {
 public:
               
-    Ptr<Node> Puentehelper (NodeContainer nodosLan,NetDeviceContainer & d_nodosLan,DataRateValue tasa_envio);
+    Ptr<Node> Puentehelper (NodeContainer nodosLan,NetDeviceContainer & d_nodosLan,DataRate tasa_envio);
   
 private:
 };
