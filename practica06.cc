@@ -49,8 +49,6 @@
 #include "retardo.h"
 #include "cola_observador.h"
 
-#include "Observador.h"
-
 #include "ns3/random-variable-stream.h"
 
 using namespace ns3;
@@ -60,25 +58,25 @@ NS_LOG_COMPONENT_DEFINE("Practica06");
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                      DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, Ptr<ExponentialRandomVariable> t_off,
                      uint64_t tam_paq, DataRateValue c_transmision, double tam_cola, double tam_tcl,
-                     Gnuplot2dDataset* curva_retardo);
+                     Average<double>* retardo_medio);
 
 int main(int argc, char *argv[])
 {
     Time::SetResolution(Time::NS);
   
-    uint32_t num_fuentes= 5;  
-    uint64_t tam_paq_value = 8192;
-    std::string tasa_envio_value = "32kbps";
+    uint32_t num_fuentes = 8;  
+    uint64_t tam_paq_value = 80;
+    std::string tasa_envio_value = "64kbps";
     std::string t_on_value = "350ms";
     std::string t_off_value = "650ms";
     std::string duracion_comunicacion_value = "50s";
-    double tam_tcl_ini = 1;
+    double tam_tcl_ini = 50;
     double tam_cola = 1;
     int num_curvas = 4;
     int num_puntos = 8; 
 
     // Capacidad de los enlaces
-    std::string c_transmision_value = "200Mbps";
+    std::string c_transmision_value = "200kbps";
     //-----------------------------------------------------------
 
     // Configuracion linea de comandos
@@ -104,14 +102,13 @@ int main(int argc, char *argv[])
     DataRate tasa_envio = DataRate(tasa_envio_value);
 
     Ptr<ExponentialRandomVariable> t_on  = CreateObject<ExponentialRandomVariable> ();
-    t_on->SetAttribute ("Mean", DoubleValue (Time(t_on_value).GetSeconds ()));
+    t_on->SetAttribute ("Mean", DoubleValue (Time(t_on_value).GetMilliSeconds()));
 
     Ptr<ExponentialRandomVariable> t_off = CreateObject<ExponentialRandomVariable> ();
-    t_off->SetAttribute ("Mean", DoubleValue (Time(t_off_value).GetSeconds ()));
+    t_off->SetAttribute ("Mean", DoubleValue (Time(t_off_value).GetMilliSeconds()));
 
     Time duracion_comunicacion = Time(duracion_comunicacion_value);
 
-    // Duración de la simulación acorde al número máximo de paquetes a enviar.
     Time duracion_simulacion = Time( duracion_comunicacion + Time("100ms") ); //Tiempo prudencial para establecer conexión
 
 
@@ -120,17 +117,19 @@ int main(int argc, char *argv[])
     std::string fileNameWithNoExtension_retardo = "practica06_retardo";
     std::string graphicsFileName_retardo = fileNameWithNoExtension_retardo + ".png";
     std::string plotFileName_retardo = fileNameWithNoExtension_retardo + ".plt";
-    std::string plotTitle_retardo="Retardo medio (ms) en funcion del tamaño de cola tcl";
+    std::string plotTitle_retardo = "R.medio/tam.Cola tcl, v.Tx: "+ c_transmision_value + ", t.paq: " 
+                                    + std::to_string(tam_paq_value) +" octetos, duración com: "+ duracion_comunicacion_value;
     
     Gnuplot grafico_retardo(plotFileName_retardo);
     grafico_retardo.SetTitle (plotTitle_retardo);
-    grafico_retardo.SetLegend ("Tamaño cola servidor (pckts)"," Retardo medio (ns)");
+    grafico_retardo.SetLegend ("Tamaño cola servidor (pckts)"," Retardo medio (ms)");
     std::ofstream fichero_retardo(plotFileName_retardo);
 
 
     // --> Bucle principal.
     //============================================================================================
     uint32_t num_fuentes_inicial = num_fuentes;
+    double TSTUDENT=2.201;
 
     for (int i = 0; i < num_curvas; i ++){
             
@@ -139,18 +138,24 @@ int main(int argc, char *argv[])
         std::string dataTitle_retardo="Número de fuentes: " + std::to_string(num_fuentes);
         curva_retardo.SetTitle (dataTitle_retardo);
         curva_retardo.SetStyle (Gnuplot2dDataset::LINES_POINTS);
+        curva_retardo.SetErrorBars(Gnuplot2dDataset::Y);
 
         double tam_tcl = tam_tcl_ini;
         
+        Average<double> retardo_medio;
         //Obtenemos puntos para un número de fuentes
         for ( int j = 0; j < num_puntos; j++){
-            
-            escenario(num_fuentes, duracion_simulacion, duracion_comunicacion,
-                    tasa_envio, t_on, t_off,
-                    tam_paq_value, c_transmision, tam_cola, tam_tcl,
-                    &curva_retardo);
-
+           
+            for( int z = 0; z < 12; z++){
+                escenario(num_fuentes, duracion_simulacion, duracion_comunicacion,
+                        tasa_envio, t_on, t_off,
+                        tam_paq_value, c_transmision, tam_cola, tam_tcl,
+                        &retardo_medio);   
+            }
+            double error=TSTUDENT*sqrt(retardo_medio.Var()/retardo_medio.Count());
+            curva_retardo.Add(tam_tcl, retardo_medio.Avg(), error);
             tam_tcl+=5;
+            retardo_medio.Reset();
         }
         grafico_retardo.AddDataset(curva_retardo);
 
@@ -166,7 +171,7 @@ int main(int argc, char *argv[])
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                 DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, 
                 Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRateValue c_transmision,
-                 double tam_cola, double tam_tcl, Gnuplot2dDataset* curva_retardo)
+                 double tam_cola, double tam_tcl, Average<double>* retardo_medio)
 {
     
     // --> Nodos y Contenedores.
@@ -271,19 +276,21 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     //=====================================================================================================
     Ptr<TrafficControlLayer> tcl = encaminador->GetObject<TrafficControlLayer> ();
     Ptr<QueueDisc> cola_tcl = tcl->GetRootQueueDiscOnDevice( encaminador->GetDevice(1) );
-    
     cola_tcl->SetMaxSize(QueueSize( ns3::PACKETS, tam_tcl));
 
+    Ptr<Queue<Packet>> cola_router = encaminador->GetDevice(1)->GetObject<CsmaNetDevice>()->GetQueue(); // Cola tx del router.    
+
     Retardo retardo(app_c, num_fuentes, app_container_sumidero.Get(0)->GetObject<UdpServer>());
-    Observador observador (app_container_sumidero.Get(0)->GetObject<UdpServer>());
-    
+    ColaObservador cola_observador(app_c, num_fuentes, cola_router, cola_tcl);
+
     std::cout <<"Nueva Simulación.\n";
     std::cout <<"===========================================================================================\n";
   
     NS_LOG_INFO("Número de fuentes: "<< num_fuentes);
     NS_LOG_INFO("Régimen Binario de las fuentes : " << tasa_envio);
-    NS_LOG_INFO("Tamaño de cola del dispositivo: "<< tam_cola);
-    NS_LOG_INFO("Tamaño de colas de control de tráfico: "<< tam_tcl);
+    NS_LOG_INFO("Tamaño de cola de dispositivos: "<< tam_cola);
+    NS_LOG_INFO("Tamaño de cola de control de tráfico: "<< cola_tcl->GetMaxSize());
+    NS_LOG_INFO("Tamaño de paquete VoIP: "<< std::to_string(tam_paq));
     NS_LOG_INFO("Duración de la comunicación VoIP: "<< duracion_comunicacion);
     std::cout <<"\n";
  
@@ -291,16 +298,26 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     Simulator::Stop(duracion_simulacion);
     Simulator::Run();
     NS_LOG_INFO("Fin simulación");
+
+    double retardo_salida;
+
+    if( retardo.TotalPaquetesRx() == 0 ){
+        retardo_salida = 0;
+    }   
+    else{
+        retardo_salida = retardo.RetardoMedio().GetMilliSeconds();
+    }
     
     std::cout <<"\nSumario: \n------------------\n";
-    //NS_LOG_INFO("OnOffApplication--> Comprobación media T.Total envío de un paquete: "<< observador->GetMediaIntervaloTx()<<" (s)");
-    //NS_LOG_INFO("Número de paquetes transmitidos por una fuente: "<< observador->GetNPaquetesTx());
-    NS_LOG_INFO("Retardo medio: "<< Seconds(retardo.RetardoMedio()));
+    NS_LOG_INFO("Número de paquetes transmitidos: "<< cola_observador.TotalPaquetesTx());
+    NS_LOG_INFO("Número de paquetes recibidos: "<< retardo.TotalPaquetesRx());
+    NS_LOG_INFO("Retardo medio (ms): "<< std::to_string(retardo_salida));
     std::cout <<"===========================================================================================\n\n";
-
+    
     //Introducimos los puntos en la curva.
     //=======================================================================================================
-    curva_retardo->Add(cola_tcl->GetMaxSize().GetValue(), retardo.RetardoMedio());
+   
+    retardo_medio->Update (retardo_salida);
     
     Simulator::Destroy();
 }

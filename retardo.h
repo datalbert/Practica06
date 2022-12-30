@@ -17,8 +17,8 @@ public:
            Retardo      (ApplicationContainer c_app_fuentes, int num_fuentes, Ptr<UdpServer> receptor);
   void     PaqueteTransmitido (Ptr<const Packet> paquete);
   void     PaqueteRecibido (Ptr<const Packet> paquete);
-  double   TotalPaquetesTx(void);
-  double RetardoMedio   ();
+  double   TotalPaquetesRx(void);
+  Time RetardoMedio   ();
 
 private:
   Time m_tiempo_tx;
