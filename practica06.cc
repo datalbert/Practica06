@@ -47,19 +47,19 @@ NS_LOG_COMPONENT_DEFINE("Practica06");
 
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                      DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, Ptr<ExponentialRandomVariable> t_off,
-                     uint64_t tam_paq, DataRate c_transmision, double tam_cola, double tam_tcl,
+                     uint64_t tam_paq, DataRateValue c_transmision, double tam_cola, double tam_tcl,
                      Average<double>* retardo_media);
 
 int main(int argc, char *argv[])
 {
     Time::SetResolution(Time::NS);
   
-    uint32_t num_fuentes= 5;  
-    uint64_t tam_paq_value = 8192;
-    std::string tasa_envio_value = "96kbps";
+    uint32_t num_fuentes= 9;  
+    uint64_t tam_paq_value = 100;
+    std::string tasa_envio_value = "64kbps";
     std::string t_on_value = "350ms";
     std::string t_off_value = "650ms";
-    std::string duracion_comunicacion_value = "300s";
+    std::string duracion_comunicacion_value = "100s";
     double tam_tcl_ini = 2;
     double tam_cola = 1;
     int num_curvas = 4;
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 
     // Conversión de parámetros a objetos ns3
     //=========================================================================================
-    DataRate c_transmision = DataRate("100kb/s");
+    DataRateValue c_transmision = DataRateValue(c_transmision_value);
     DataRate tasa_envio = DataRate(tasa_envio_value);
 
     Ptr<ExponentialRandomVariable> t_on  = CreateObject<ExponentialRandomVariable> ();
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     std::string fileNameWithNoExtension_retardo = "practica06_retardo";
     std::string graphicsFileName_retardo = fileNameWithNoExtension_retardo + ".png";
     std::string plotFileName_retardo = fileNameWithNoExtension_retardo + ".plt";
-    std::string plotTitle_retardo="Retardo medio (ms) en funcion del tamaño de cola tcl";
+    std::string plotTitle_retardo="Retardo medio (ms) con tasa envio 64kb/s velocidad enlace=100kb/s duracion de la simulacion 100s y tamaño de paquete 100 octetos";
     
     Gnuplot grafico_retardo(plotFileName_retardo);
     grafico_retardo.SetTitle (plotTitle_retardo);
@@ -140,13 +140,13 @@ int main(int argc, char *argv[])
                         &retardo_media);
                 
             }
-            NS_LOG_DEBUG("Retardo para la curva "<< i << " el punto " << j << " con tam cola; "<< tam_tcl <<" es igual " << retardo_media.Avg());
+            //NS_LOG_DEBUG("Retardo para la curva "<< i << " el punto " << j << " con tam cola; "<< tam_tcl <<" es igual " << retardo_media.Avg());
             double error=TSTUDENT*sqrt(retardo_media.Var()/retardo_media.Count());
             curva_retardo.Add(tam_tcl, retardo_media.Avg(),error);
             tam_tcl+=5;
             retardo_media.Reset();
         }
-        NS_LOG_DEBUG("------------------");
+        //NS_LOG_DEBUG("------------------");
 
         grafico_retardo.AddDataset(curva_retardo);
 
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 
 void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_comunicacion,
                 DataRate tasa_envio, Ptr<ExponentialRandomVariable> t_on, 
-                Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRate c_transmision,
+                Ptr<ExponentialRandomVariable> t_off, uint64_t tam_paq, DataRateValue c_transmision,
                  double tam_cola, double tam_tcl, Average<double>* retardo_media)
 {
 
@@ -203,10 +203,10 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
     
     onoff.SetAttribute("OnTime", PointerValue(t_on));
     onoff.SetAttribute("OffTime", PointerValue(t_off));
-    //onoff.SetAttribute("DataRate", DataRateValue(tasa_envio));
-    //onoff.SetAttribute("PacketSize", UintegerValue(tam_paq));
+    onoff.SetAttribute("DataRate", DataRateValue(tasa_envio));
+    onoff.SetAttribute("PacketSize", UintegerValue(tam_paq));
     
-    onoff.SetConstantRate(tasa_envio);
+    //onoff.SetConstantRate(tasa_envio);
     onoff.SetAttribute("StopTime", TimeValue(duracion_comunicacion));
 
     ApplicationContainer app_c;
@@ -249,8 +249,10 @@ void escenario(uint32_t num_fuentes, Time duracion_simulacion, Time duracion_com
 
     //Introducimos los puntos en la curva.
     //=======================================================================================================
-    retardo_media->Update(retardo.RetardoMedio().GetDouble());
     
+    double tiempo_retardo=double(retardo.RetardoMedio().GetMilliSeconds());
+    //retardo_media->Update(retardo.RetardoMedio().GetDouble());
+    retardo_media->Update(tiempo_retardo);
     
 }
 

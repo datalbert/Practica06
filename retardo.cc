@@ -63,7 +63,7 @@ Retardo::PaqueteRecibido(Ptr<const Packet> paquete)
 Time
 Retardo::RetardoMedio ()
 {
-  return NanoSeconds(media_retardo.Mean());
+  return NanoSeconds(media_retardo.Avg());
 }
 
 double

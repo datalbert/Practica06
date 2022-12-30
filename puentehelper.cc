@@ -3,14 +3,14 @@
 
  
  Ptr<Node> 
- PuenteHelper::Puentehelper (NodeContainer nodosLan,NetDeviceContainer & d_nodosLan,DataRate tasa_envio)
+ PuenteHelper::Puentehelper (NodeContainer nodosLan,NetDeviceContainer & d_nodosLan,DataRateValue tasa_envio)
  {
    NetDeviceContainer d_puertosBridge;
   CsmaHelper         h_csma;
   BridgeHelper       h_bridge;
   Ptr<Node>          puente = CreateObject<Node> ();
   
-  h_csma.SetChannelAttribute("DataRate", DataRateValue(tasa_envio));
+  h_csma.SetChannelAttribute("DataRate", tasa_envio);
   for (NodeContainer::Iterator indice = nodosLan.Begin ();
        indice != nodosLan.End ();
        indice++)
